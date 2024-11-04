@@ -12,18 +12,25 @@ async function WebsiteManip(app) {
 
   /////////////////////// redirecting to website ///////////////////////
   app.get('/:nanoidInput', async (request, reply) => {
-    const nanoidInput = Object.values(request.params)[0];
-    const website = await knex('db-url').select('website').where({nanoidWebsite: nanoidInput}).first();
-    console.log(Object.values(website)[0]);
-    return website;
-  })
+
+    const { nanoidInput } = request.params;
+
+    const record = await knex('db-url').select('website').where({nanoidWebsite: nanoidInput}).first();
+    
+    if (record) {
+      return reply.redirect(record.website.startsWith("http") ? record.website : `http://${record.website}`);
+    } else {
+      reply.status(404).send({error: 'url not found'});
+    }
+
+  });
 
 
   //////////////////////// listing all websites ////////////////////////
   app.get('/', async () => {
     //return await knex('db-url').select('*');
+    //console.log(websites);
     const websites = await knex('db-url').select('website').groupBy('website').count('website as howMany');
-    console.log(websites);
     return websites;
   });
 
@@ -37,17 +44,13 @@ async function WebsiteManip(app) {
 
     const { website } = createWebsiteNanoIdBodySchema.parse(
       request.body,
-    )
+    );
 
+    let shortid;
     const checkWebsiteExists = await knex('db-url').select('nanoidWebsite').where({website: website}).first();
 
     if (checkWebsiteExists) {
-      await knex('db-url')
-      .insert({
-        id: crypto.randomUUID(),
-        nanoidWebsite: checkWebsiteExists.nanoidWebsite,
-        website,
-      });
+      shortid = checkWebsiteExists.nanoidWebsite;
     } else {
       await knex('db-url')
       .insert({
@@ -57,7 +60,9 @@ async function WebsiteManip(app) {
       });
     };
     
-    return reply.status(201).send();
+    //console.log(shortid);
+
+    return reply.status(201).send({ shortUrl: shortid });
 
   });
 
